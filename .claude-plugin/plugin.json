@@ -1,0 +1,11 @@
+{
+  "name": "choitree",
+  "version": "0.1.0",
+  "description": "파일 트리·git 상태·Claude 작업 위치·토큰 사용량을 한눈에 보여주는 라이브 패널",
+  "author": { "name": "choidevhi", "email": "hi@choidev.com", "url": "https://choidev.com" },
+  "homepage": "https://choidev.com",
+  "repository": "https://github.com/choidevhi/choitree",
+  "license": "MIT",
+  "keywords": ["file-tree", "git", "pane", "tokens", "explorer"],
+  "types": "./types/index.d.ts"
+}
