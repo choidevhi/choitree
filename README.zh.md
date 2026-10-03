@@ -40,23 +40,37 @@
 - 终端宽度不少于 144 列时，会话开始时自动打开；也可以输入 `/choitree` 打开。
 - 鼠标：点击文件夹折叠/展开，点击文件把 `@路径` 插入提示。
 - 键盘：`ctrl+x tab` 聚焦面板，`↑` `↓` 移动，`Enter` 打开/折叠。
-- 语言：默认跟随 Claude Code 的 `language` 设置；可在 `/config` 中把插件的 `language` 选项设为 `ko`、`en`、`zh` 或 `ja`。
+- 语言：默认英语；可在 `/config` 中把插件的 `language` 选项设为 `ko`、`zh` 或 `ja`。
 
 ## 隐私与范围
 
-- **不向外发送任何数据。** choitree 不发起网络请求。
-- **仅限当前项目。** 文件树和 git 状态只覆盖会话的项目文件夹（`$.session.root()`）。不读取文件内容，只列出文件名。
-- **用量数据**来自 Claude Code 本身（`$.session.usage()` 与会话的模型响应），不调用任何 API。
+**choitree 不向任何地方发送任何内容。** 不发起网络请求、不写文件、会话结束后不保留数据。读取的内容只显示在面板中。
+
+### 读取什么、去向何处
+
+| 调用 | 读取的内容 | 去向 |
+|---|---|---|
+| `$.session.root()` | 会话的项目文件夹路径 | 用于把其他所有读取限制在该文件夹内 |
+| `$.process.run`（仅 `git`，见下文） | 项目文件夹的文件名、分支名和 git 状态 | 仅显示在面板中 |
+| `$.fs.list` | 仅在不是 git 仓库时，项目文件夹顶层的文件和文件夹名 | 仅显示在面板中 |
+| `tool.call` hook 输入 | 工具处理的文件路径，仅保留项目内的 | 仅显示在面板中（`▶`、`← Read`） |
+| `$.session.usage()` / `turn.step` 结果 | Claude Code 已有的 token 数、会话费用、上下文大小和使用额度 | 仅显示在面板中 |
+| `options.language` | 插件自身的 `language` 选项 | 选择面板语言 |
+| `$.prompt.fill` | 不读取。点击文件时把 `@路径` 写入提示框 | 提示输入框 |
+
+- **从不读取文件内容**，只看文件名和 git 状态。
+- **仅限当前项目。** 即使 git 仓库从项目文件夹的上层开始，也不包含文件夹外的文件。
+- **不读取电脑上的设置值。** 语言只来自插件选项（`user_config`）。
 
 ### 运行的程序
 
-只在项目文件夹中以固定参数运行 `git`：`git rev-parse --show-prefix`（检查是否在仓库中）、`git branch --show-current`（分支名）、`git ls-files`（文件列表）、`git status --porcelain=v1 -uall -- .`（变更文件）。
+只在项目文件夹中运行 `git`，每条命令都以固定文本完整写在调用中（`$.process.run(['git', ...], { cwd: root })`）：`git rev-parse --show-prefix`（检查是否在仓库中）、`git branch --show-current`（分支名）、`git ls-files`（文件列表）、`git status --porcelain=v1 -uall -- .`（变更文件）。
 
 ### 各个 hook 的作用
 
 | Hook | 作用 |
 |---|---|
-| `session.start` | 读取语言设置、注册 `/choitree`、扫描项目、打开面板 |
+| `session.start` | 读取 `language` 选项、注册 `/choitree`、扫描项目、打开面板 |
 | `command.run` | 重新扫描并打开面板 |
 | `turn.start` / `turn.complete` | 开始/停止角色动画，回合结束后重新读取 git 状态 |
 | `turn.step` | 累加每次模型响应的 token 数，响应原样传递 |

@@ -1,16 +1,26 @@
-import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import type { Activity, Snapshot, Tokens, Touch } from '../types'
+type Touch = { path: string; tool: string; at: number }
+type Snapshot = { root: string; branch: string; files: string[]; status: Record<string, string>; isRepo: boolean }
+type Activity = { busy: boolean; since: number; frame: number; tool: string }
+type Tokens = { input: number; output: number; cacheRead: number; cacheWrite: number; steps: number }
 
 const PANE = 'choitree'
-const touches = atom({ plugin: 'choitree', key: 'touches' } as const, [] as Touch[])
-const snap = atom({ plugin: 'choitree', key: 'snap' } as const, null as Snapshot | null)
 
-const opened = atom({ plugin: 'choitree', key: 'opened' } as const, {} as Record<string, boolean>)
 
-const activity = atom({ plugin: 'choitree', key: 'activity' } as const, { busy: false, since: 0, frame: 0, tool: '' } as Activity)
-const tokens = atom({ plugin: 'choitree', key: 'tokens' } as const, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, steps: 0 } as Tokens)
+// 패널이 그리는 값. 모듈 안에만 두고, 바뀌면 다시 그린다.
+const state = {
+  touches: [] as Touch[],
+  snap: null as Snapshot | null,
+  opened: {} as Record<string, boolean>,
+  activity: { busy: false, since: 0, frame: 0, tool: '' } as Activity,
+  tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, steps: 0 } as Tokens,
+}
+type State = typeof state
+const set = <K extends keyof State>($: any, key: K, fn: (v: State[K]) => State[K]) => {
+  state[key] = fn(state[key])
+  $.ui.invalidate('ui.render')
+}
 let ticker: { cancel: () => void } | undefined
 
 const fmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(n))
@@ -73,8 +83,8 @@ const when = (iso: string) => {
   return d.toDateString() === new Date().toDateString() ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`
 }
 
-const pickLang = (want: string, setting: unknown): Lang => {
-  const v = String(want === 'auto' ? (setting ?? '') : want).toLowerCase()
+const pickLang = (want: string): Lang => {
+  const v = want.toLowerCase()
   if (/^(ko|kor|korean)|한국/.test(v)) return 'ko'
   if (/^(zh|chi|chinese)|中文|汉语|漢語/.test(v)) return 'zh'
   if (/^(ja|jp|jpn|japanese)|日本/.test(v)) return 'ja'
@@ -91,13 +101,13 @@ const inside = (root: string, p: string) => {
 // 세션의 프로젝트 루트 아래만 본다. git 저장소가 더 위에 있어도 루트 밖 파일은 넣지 않는다.
 const scan = async ($: any): Promise<Snapshot> => {
   const root = norm(await $.session.root())
-  const git = (args: string[]) => $.process.run(['git', ...args], { cwd: root }).catch(() => null)
-  const pre = await git(['rev-parse', '--show-prefix'])
+  const run = (p: Promise<any>) => p.catch(() => null)
+  const pre = await run($.process.run(['git', 'rev-parse', '--show-prefix'], { cwd: root }))
   if (pre && pre.exitCode === 0) {
     const prefix = pre.stdout.trim()
-    const br = await git(['branch', '--show-current'])
-    const ls = await git(['ls-files'])
-    const st = await git(['status', '--porcelain=v1', '-uall', '--', '.'])
+    const br = await run($.process.run(['git', 'branch', '--show-current'], { cwd: root }))
+    const ls = await run($.process.run(['git', 'ls-files'], { cwd: root }))
+    const st = await run($.process.run(['git', 'status', '--porcelain=v1', '-uall', '--', '.'], { cwd: root }))
     const status: Record<string, string> = {}
     for (const line of (st?.stdout ?? '').split('\n')) {
       if (line.length < 4) continue
@@ -121,7 +131,7 @@ const scan = async ($: any): Promise<Snapshot> => {
 
 const refresh = async ($: any) => {
   const s = await scan($)
-  await update($, snap, () => s)
+  set($, 'snap', () => s)
 }
 
 const ICON: Record<string, [string, string]> = {
@@ -176,8 +186,7 @@ type Line = { depth: number; label: string; path: string; isDir: boolean; count:
 
 export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
-    const settings = await $.settings.read().catch(() => ({}) as Record<string, unknown>)
-    L = T[pickLang(String((options as any)?.language ?? 'auto'), settings.language)]
+    L = T[pickLang(String((options as any)?.language ?? 'en'))]
     await $.command.register({ name: 'choitree', description: L.cmd })
     void refresh($)
     void $.ui.open({ id: PANE, title: 'choitree' })
@@ -185,16 +194,16 @@ export const register: Register = (on, options) => {
   })
 
   on('turn.start', async ($, e, next) => {
-    await update($, activity, a => ({ ...a, busy: true, since: Date.now(), tool: '' }))
+    set($, 'activity', a => ({ ...a, busy: true, since: Date.now(), tool: '' }))
     ticker?.cancel()
-    ticker = $.clock.every(250, () => void update($, activity, a => ({ ...a, frame: a.frame + 1 })))
+    ticker = $.clock.every(250, () => set($, 'activity', a => ({ ...a, frame: a.frame + 1 })))
     return next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
     ticker?.cancel()
     ticker = undefined
-    await update($, activity, a => ({ ...a, busy: false, tool: '' }))
+    set($, 'activity', a => ({ ...a, busy: false, tool: '' }))
     void refresh($)
     return next(e)
   })
@@ -203,7 +212,7 @@ export const register: Register = (on, options) => {
     const r = yield* next(e)
     const u = (r as any)?.usage
     if (u) {
-      await update($, tokens, t => ({
+      set($, 'tokens', t => ({
         input: t.input + (u.input_tokens ?? 0),
         output: t.output + (u.output_tokens ?? 0),
         cacheRead: t.cacheRead + (u.cache_read_input_tokens ?? 0),
@@ -225,9 +234,9 @@ export const register: Register = (on, options) => {
     const p = a.file_path ?? a.notebook_path ?? (a.tool === 'Grep' || a.tool === 'Glob' ? a.path : undefined)
     if (typeof p === 'string' && inside(norm(await $.session.root()), norm(p))) {
       const t: Touch = { path: norm(p), tool: a.tool, at: Date.now() }
-      await update($, touches, l => [...l.filter(x => x.path !== t.path), t].slice(-30))
+      set($, 'touches', l => [...l.filter(x => x.path !== t.path), t].slice(-30))
     }
-    void update($, activity, x => ({ ...x, tool: a.tool }))
+    set($, 'activity', x => ({ ...x, tool: a.tool }))
     const ran = await next(e)
     if (['Edit', 'Write', 'NotebookEdit', 'Bash', 'PowerShell'].includes(a.tool)) void refresh($)
     return ran
@@ -235,12 +244,12 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
-    const ov = await read($, opened)
-    const s = await read($, snap)
-    const ts = await read($, touches)
+    const ov = state.opened
+    const s = state.snap
+    const ts = state.touches
     if (!s) return <Text dimColor>{L.scanning}</Text>
-    const act = await read($, activity)
-    const tk = await read($, tokens)
+    const act = state.activity
+    const tk = state.tokens
     const us = await $.session.usage().catch(() => undefined)
     const body = act.busy ? BODY[Math.floor(act.frame / 2) % BODY.length]! : IDLE
     const secs = act.busy ? Math.floor((Date.now() - act.since) / 1000) : 0
@@ -352,7 +361,7 @@ export const register: Register = (on, options) => {
                 dimColor={!isCur && !t && !l.isDir && !st}
                 onPress={() =>
                   l.isDir
-                    ? void update($, opened, o => ({ ...o, [l.path]: !hot(l.path) }))
+                    ? set($, 'opened', o => ({ ...o, [l.path]: !hot(l.path) }))
                     : void $.prompt.fill({ text: `@${l.path} `, mode: 'insert' })
                 }
               />

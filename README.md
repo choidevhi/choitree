@@ -73,17 +73,31 @@ claude plugin install choitree@choitree
 
 ### Language
 
-The pane follows Claude Code's `language` setting by default. To pick one, set the plugin's `language` option to `ko`, `en`, `zh` or `ja` in `/config`.
+The pane is in English by default. To change it, set the plugin's `language` option to `ko`, `zh` or `ja` in `/config`.
 
 ## Privacy and scope
 
-- **Nothing leaves your computer.** choitree makes no network requests and sends no data anywhere. It never reads file contents; it only lists file names.
-- **Current project only.** The tree and git status cover only the session's project folder (`$.session.root()`). If the git repository starts above that folder, files outside it are left out. Files Claude touches outside the project are not shown.
-- **Usage figures** (tokens, cost, context, limits) come from Claude Code itself through `$.session.usage()` and the model responses of the session. choitree does not call any API for them.
+**choitree sends nothing anywhere.** It makes no network requests, writes no files, and keeps no data after the session. Everything it reads is shown in the pane and nowhere else.
+
+### What it reads and where it goes
+
+| Call | What it reads | Where it goes |
+|---|---|---|
+| `$.session.root()` | The path of the session's project folder | Used to limit every other read to that folder |
+| `$.process.run` (`git` only, see below) | File names, branch name and git status of the project folder | Drawn in the pane only |
+| `$.fs.list` | File and folder names at the top of the project folder, only when it is not a git repository | Drawn in the pane only |
+| `tool.call` hook input | The file path a tool works on, kept only if it is inside the project | Drawn in the pane only (`▶`, `← Read`) |
+| `$.session.usage()` / `turn.step` result | Token counts, session cost, context size and usage limits that Claude Code already has | Drawn in the pane only |
+| `options.language` | The plugin's own `language` option | Picks the pane language |
+| `$.prompt.fill` | Nothing read. Writes `@path` into your prompt box when you click a file | Your prompt box |
+
+- **File contents are never read.** Only names and git status.
+- **Current project only.** If the git repository starts above the project folder, files outside the folder are left out. Paths outside the project that Claude touches are not shown.
+- **No values are read from your computer's settings.** The language comes only from the plugin option (`user_config`).
 
 ### Programs it runs
 
-choitree runs only `git`, always with fixed arguments, in the project folder. It never runs a command built from user input or file contents.
+choitree runs only `git`, in the project folder. Each command is written out in full as fixed text in the call (`$.process.run(['git', ...], { cwd: root })`); none is built from user input or file contents. It never runs a command built from user input or file contents.
 
 | Command | Why |
 |---|---|
@@ -98,7 +112,7 @@ If `git` is missing or the folder is not a repository, it lists the top level of
 
 | Hook | What it does |
 |---|---|
-| `session.start` | Reads the language setting, registers `/choitree`, scans the project, opens the pane |
+| `session.start` | Reads the `language` option, registers `/choitree`, scans the project, opens the pane |
 | `command.run` (`/choitree`) | Rescans and opens the pane |
 | `turn.start` / `turn.complete` | Starts and stops the character animation; rescans git status when a turn ends |
 | `turn.step` | Adds up the token counts of each model response. The response itself is passed on unchanged |

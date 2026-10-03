@@ -7,7 +7,7 @@
       "name": "choitree",
       "source": "./",
       "description": "Live pane: file tree, git status, where Claude is working, tokens and usage limits",
-      "version": "0.3.1",
+      "version": "0.4.0",
       "homepage": "https://choidev.com",
       "category": "productivity"
     }
