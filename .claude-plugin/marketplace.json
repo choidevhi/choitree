@@ -6,8 +6,8 @@
     {
       "name": "choitree",
       "source": "./",
-      "description": "파일 트리·git 상태·Claude 작업 위치·토큰 사용량을 한눈에 보여주는 라이브 패널",
-      "version": "0.1.0",
+      "description": "Live pane: file tree, git status, where Claude is working, tokens and usage limits",
+      "version": "0.2.0",
       "homepage": "https://choidev.com",
       "category": "productivity"
     }

@@ -18,7 +18,6 @@ let ticker: { cancel: () => void } | undefined
 
 const fmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(n))
 const SPIN = ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢']
-const VERB = ['생각하는 중', '코드 읽는 중', '열심히 작업 중', '두드리는 중', '고민하는 중']
 // Claude Code 마스코트: 눈 깜빡임·발 구르기 프레임
 const BODY = [
   [' ▐▛███▜▌ ', '▝▜█████▛▘', '  ▘▘ ▝▝  '],
@@ -28,26 +27,102 @@ const BODY = [
 ]
 const IDLE = [' ▐▛███▜▌ ', ' ▜█████▛ ', '  ▘▘ ▝▝  ']
 
-const norm = (p: string) => p.replace(/\\/g, '/')
+type Lang = 'ko' | 'en' | 'zh' | 'ja'
+const T = {
+  ko: {
+    cmd: '파일 트리·git 상태·작업 위치 패널 열기', opened: 'choitree 패널을 열었습니다.', scanning: '스캔 중…',
+    verbs: ['생각하는 중', '코드 읽는 중', '열심히 작업 중', '두드리는 중', '고민하는 중'], idle: '대기 중 zZ',
+    steps: (n: number) => `요청 ${n}회`, context: '컨텍스트', limit: '한도', reset: '리셋',
+    changed: (n: number) => `변경 ${n}개`, clean: '깨끗함 ✓', notRepo: 'git 저장소 아님', nothing: '(아직 작업 없음)',
+    more: (n: number) => `… ${n}개 더`, keys1: '⌨ ctrl+x tab 패널 포커스 · ↑↓ 이동 · Enter 열기/접기',
+    keys2: '  📂 폴더 클릭 접기/펼치기 · 파일 클릭 코드 보기 · @ 프롬프트에 넣기',
+    pick: '트리에서 파일을 클릭하세요.', lines: '줄', vkeys: '⌨ g 맨위 · k 위 · j 아래 · e 맨끝 · a @넣기 · x/Esc 닫기',
+    kinds: { five_hour: '5시간', seven_day: '주간', seven_day_opus: '주간Opus', seven_day_sonnet: '주간Sonnet', spend_limit: '지출' } as Record<string, string>,
+    binary: '(바이너리 파일)', cut: '… (잘림)', unreadable: '(읽을 수 없음)', outside: '(프로젝트 밖 파일은 열 수 없습니다)',
+  },
+  en: {
+    cmd: 'Open the file tree / git status / work location pane', opened: 'choitree pane opened.', scanning: 'Scanning…',
+    verbs: ['Thinking', 'Reading code', 'Working hard', 'Typing away', 'Pondering'], idle: 'Idle zZ',
+    steps: (n: number) => `${n} requests`, context: 'Context', limit: 'Limit', reset: 'resets',
+    changed: (n: number) => `${n} changed`, clean: 'clean ✓', notRepo: 'not a git repository', nothing: '(no work yet)',
+    more: (n: number) => `… ${n} more`, keys1: '⌨ ctrl+x tab focus pane · ↑↓ move · Enter open/fold',
+    keys2: '  📂 click folder to fold · click file to view code · @ insert into prompt',
+    pick: 'Click a file in the tree.', lines: 'lines', vkeys: '⌨ g top · k up · j down · e end · a insert @ · x/Esc close',
+    kinds: { five_hour: '5-hour', seven_day: 'Weekly', seven_day_opus: 'Wk Opus', seven_day_sonnet: 'Wk Sonnet', spend_limit: 'Spend' } as Record<string, string>,
+    binary: '(binary file)', cut: '… (truncated)', unreadable: '(cannot read)', outside: '(files outside the project cannot be opened)',
+  },
+  zh: {
+    cmd: '打开文件树 / git 状态 / 工作位置面板', opened: '已打开 choitree 面板。', scanning: '扫描中…',
+    verbs: ['思考中', '阅读代码中', '努力工作中', '敲代码中', '琢磨中'], idle: '待机中 zZ',
+    steps: (n: number) => `请求 ${n} 次`, context: '上下文', limit: '额度', reset: '重置',
+    changed: (n: number) => `${n} 个变更`, clean: '干净 ✓', notRepo: '不是 git 仓库', nothing: '(尚无工作)',
+    more: (n: number) => `… 还有 ${n} 个`, keys1: '⌨ ctrl+x tab 聚焦面板 · ↑↓ 移动 · Enter 打开/折叠',
+    keys2: '  📂 点击文件夹折叠/展开 · 点击文件查看代码 · @ 插入到提示',
+    pick: '请在树中点击文件。', lines: '行', vkeys: '⌨ g 顶部 · k 上 · j 下 · e 底部 · a 插入@ · x/Esc 关闭',
+    kinds: { five_hour: '5小时', seven_day: '每周', seven_day_opus: '每周Opus', seven_day_sonnet: '每周Sonnet', spend_limit: '支出' } as Record<string, string>,
+    binary: '(二进制文件)', cut: '… (已截断)', unreadable: '(无法读取)', outside: '(无法打开项目外的文件)',
+  },
+  ja: {
+    cmd: 'ファイルツリー・git 状態・作業位置パネルを開く', opened: 'choitree パネルを開きました。', scanning: 'スキャン中…',
+    verbs: ['考え中', 'コードを読み中', 'がんばって作業中', 'タイプ中', '悩み中'], idle: '待機中 zZ',
+    steps: (n: number) => `リクエスト ${n} 回`, context: 'コンテキスト', limit: '上限', reset: 'リセット',
+    changed: (n: number) => `変更 ${n} 件`, clean: 'クリーン ✓', notRepo: 'git リポジトリではありません', nothing: '(まだ作業なし)',
+    more: (n: number) => `… 他 ${n} 件`, keys1: '⌨ ctrl+x tab パネルにフォーカス · ↑↓ 移動 · Enter 開く/たたむ',
+    keys2: '  📂 フォルダをクリックで開閉 · ファイルをクリックでコード表示 · @ プロンプトに挿入',
+    pick: 'ツリーのファイルをクリックしてください。', lines: '行', vkeys: '⌨ g 先頭 · k 上 · j 下 · e 末尾 · a @挿入 · x/Esc 閉じる',
+    kinds: { five_hour: '5時間', seven_day: '週間', seven_day_opus: '週Opus', seven_day_sonnet: '週Sonnet', spend_limit: '支出' } as Record<string, string>,
+    binary: '(バイナリファイル)', cut: '… (省略)', unreadable: '(読み込めません)', outside: '(プロジェクト外のファイルは開けません)',
+  },
+}
+let L: (typeof T)['ko'] = T.en
 
+// 리셋 시각: 오늘이면 HH:MM, 아니면 MM-DD HH:MM (현지 시간)
+const when = (iso: string) => {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return d.toDateString() === new Date().toDateString() ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`
+}
+
+const pickLang = (want: string, setting: unknown): Lang => {
+  const v = String(want === 'auto' ? (setting ?? '') : want).toLowerCase()
+  if (/^(ko|kor|korean)|한국/.test(v)) return 'ko'
+  if (/^(zh|chi|chinese)|中文|汉语|漢語/.test(v)) return 'zh'
+  if (/^(ja|jp|jpn|japanese)|日本/.test(v)) return 'ja'
+  return 'en'
+}
+
+const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '')
+const inside = (root: string, p: string) => {
+  const r = root.toLowerCase()
+  const q = p.toLowerCase()
+  return q === r || q.startsWith(r + '/')
+}
+
+// 세션의 프로젝트 루트 아래만 본다. git 저장소가 더 위에 있어도 루트 밖 파일은 넣지 않는다.
 const scan = async ($: any): Promise<Snapshot> => {
-  const root = norm(await $.session.cwd())
-  const top = await $.process.run(['git', 'rev-parse', '--show-toplevel']).catch(() => null)
-  if (top && top.exitCode === 0) {
-    const gitRoot = norm(top.stdout.trim())
-    const br = await $.process.run(['git', 'branch', '--show-current'], { cwd: gitRoot })
-    const ls = await $.process.run(['git', 'ls-files'], { cwd: gitRoot })
-    const st = await $.process.run(['git', 'status', '--porcelain', '-uall'], { cwd: gitRoot })
+  const root = norm(await $.session.root())
+  const git = (args: string[]) => $.process.run(['git', ...args], { cwd: root }).catch(() => null)
+  const pre = await git(['rev-parse', '--show-prefix'])
+  if (pre && pre.exitCode === 0) {
+    const prefix = pre.stdout.trim()
+    const br = await git(['branch', '--show-current'])
+    const ls = await git(['ls-files'])
+    const st = await git(['status', '--porcelain=v1', '-uall', '--', '.'])
     const status: Record<string, string> = {}
-    for (const line of st.stdout.split('\n')) {
+    for (const line of (st?.stdout ?? '').split('\n')) {
       if (line.length < 4) continue
-      const p = line.slice(3).split(' -> ').pop()!.replace(/^"|"$/g, '')
+      let p = line.slice(3).split(' -> ').pop()!.replace(/^"|"$/g, '')
+      if (prefix && !p.startsWith(prefix)) continue
+      p = p.slice(prefix.length)
       status[p] = line.slice(0, 2).trim() || 'M'
     }
-    const files = [...new Set([...ls.stdout.split('\n').filter(Boolean), ...Object.keys(status)])].sort()
-    return { root: gitRoot, branch: br.stdout.trim() || '(detached)', files, status, isRepo: true }
+    const files = [...new Set([...(ls?.stdout ?? '').split('\n').filter(Boolean), ...Object.keys(status)])]
+      .filter(f => !f.startsWith('../'))
+      .sort()
+    return { root, branch: br?.stdout.trim() || '(detached)', files, status, isRepo: true }
   }
-  const entries = await $.fs.list().catch(() => [])
+  const entries = await $.fs.list(root).catch(() => [])
   const files = entries
     .filter((x: any) => !x.name.startsWith('.'))
     .map((x: any) => x.name)
@@ -111,21 +186,27 @@ const iconOf = (label: string, isDir: boolean, isOpen: boolean) => {
 const openView = async ($: any, root: string, path: string) => {
   let text: string
   try {
-    text = await $.fs.read(`${root}/${path}`)
-    if (text.includes('\u0000')) text = '(바이너리 파일)'
-    else if (text.length > 400000) text = text.slice(0, 400000) + '\n… (잘림)'
+    if (path.split('/').includes('..')) throw new Error('outside')
+    const realRoot = norm((await $.fs.stat(root, { resolve: true })).realPath ?? root)
+    const st = await $.fs.stat(`${root}/${path}`, { resolve: true })
+    if (!st.realPath || !inside(realRoot, norm(st.realPath))) throw new Error('outside')
+    text = await $.fs.read(norm(st.realPath))
+    if (text.includes('\u0000')) text = L.binary
+    else if (text.length > 400000) text = text.slice(0, 400000) + '\n' + L.cut
   } catch (err) {
-    text = `(읽을 수 없음: ${String(err)})`
+    text = String(err).includes('outside') ? L.outside : L.unreadable
   }
   await update($, viewing, () => ({ path, text, top: 0 }))
-  await $.ui.open({ id: VIEW, title: path })
+  await $.ui.open({ id: VIEW, title: `${path.split('/').pop()} ✕`, closeOnEscape: true })
 }
 
 type Line = { depth: number; label: string; path: string; isDir: boolean; count: number }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'choitree', description: '파일 트리·git 상태·작업 위치 패널 열기' })
+    const settings = await $.settings.read().catch(() => ({}) as Record<string, unknown>)
+    L = T[pickLang(String((options as any)?.language ?? 'auto'), settings.language)]
+    await $.command.register({ name: 'choitree', description: L.cmd })
     void refresh($)
     void $.ui.open({ id: PANE, title: 'choitree' })
     return next(e)
@@ -164,13 +245,13 @@ export const register: Register = on => {
   on('command.run', { command: 'choitree' }, async $ => {
     await refresh($)
     await $.ui.open({ id: PANE, title: 'choitree' })
-    return { text: 'choitree 패널을 열었습니다.' }
+    return { text: L.opened }
   })
 
   on('tool.call', async ($, e, next) => {
     const a = e as any
     const p = a.file_path ?? a.notebook_path ?? (a.tool === 'Grep' || a.tool === 'Glob' ? a.path : undefined)
-    if (typeof p === 'string') {
+    if (typeof p === 'string' && inside(norm(await $.session.root()), norm(p))) {
       const t: Touch = { path: norm(p), tool: a.tool, at: Date.now() }
       await update($, touches, l => [...l.filter(x => x.path !== t.path), t].slice(-30))
     }
@@ -185,8 +266,7 @@ export const register: Register = on => {
     const ov = await read($, opened)
     const s = await read($, snap)
     const ts = await read($, touches)
-    const rows = Math.max(6, (e.viewport?.rows ?? 30) - 16)
-    if (!s) return <Text dimColor>스캔 중…</Text>
+    if (!s) return <Text dimColor>{L.scanning}</Text>
     const act = await read($, activity)
     const tk = await read($, tokens)
     const us = await $.session.usage().catch(() => undefined)
@@ -195,7 +275,8 @@ export const register: Register = on => {
     const ctx = us?.context
     const pct = ctx?.percent ?? (ctx?.tokens ? (ctx.tokens / ctx.window) * 100 : 0)
     const bar = '█'.repeat(Math.round(pct / 10)) + '░'.repeat(10 - Math.round(pct / 10))
-    const limit = us?.rateLimits?.[0]
+    const limits = us?.rateLimits ?? []
+    const rows = Math.max(6, (e.viewport?.rows ?? 30) - 16 - limits.length)
 
     const lowRoot = s.root.toLowerCase() + '/'
     const rel = (p: string) => (p.toLowerCase().startsWith(lowRoot) ? p.slice(lowRoot.length) : p)
@@ -239,11 +320,11 @@ export const register: Register = on => {
           </Box>
           <Box flexDirection="column">
             {act.busy ? (
-              <Text color="#D97757" bold>{SPIN[act.frame % SPIN.length]} {VERB[Math.floor(act.since / 1000) % VERB.length]}… <Text dimColor>{secs}s</Text></Text>
+              <Text color="#D97757" bold>{SPIN[act.frame % SPIN.length]} {L.verbs[Math.floor(act.since / 1000) % L.verbs.length]}… <Text dimColor>{secs}s</Text></Text>
             ) : (
-              <Text dimColor>✳ 대기 중 zZ</Text>
+              <Text dimColor>✳ {L.idle}</Text>
             )}
-            <Text dimColor>{act.busy && act.tool ? `🔧 ${act.tool}` : `요청 ${tk.steps}회`}</Text>
+            <Text dimColor>{act.busy && act.tool ? `🔧 ${act.tool}` : L.steps(tk.steps)}</Text>
             <Text>
               <Text color="cyan">↑{fmt(tk.input + tk.cacheRead + tk.cacheWrite)}</Text>
               <Text color="magenta"> ↓{fmt(tk.output)}</Text>
@@ -253,24 +334,32 @@ export const register: Register = on => {
         </Box>
         {ctx && (
           <Text>
-            <Text dimColor>컨텍스트 </Text>
+            <Text dimColor>{L.context} </Text>
             <Text color={pct > 80 ? 'red' : pct > 50 ? 'yellow' : 'green'}>{bar}</Text>
             <Text dimColor> {pct.toFixed(0)}% ({fmt(ctx.tokens ?? 0)}/{fmt(ctx.window)})</Text>
           </Text>
         )}
-        {limit && (
-          <Text dimColor>한도 {limit.kind} {limit.percentUsed.toFixed(0)}%{limit.resetsAt ? ` · 리셋 ${limit.resetsAt.slice(11, 16)}` : ''}</Text>
-        )}
+        {limits.map(r => {
+          const used = Math.max(0, Math.min(100, r.percentUsed))
+          const n = Math.round(used / 10)
+          return (
+            <Text key={r.kind}>
+              <Text dimColor>{(L.kinds[r.kind as keyof typeof L.kinds] ?? r.kind).padEnd(6)} </Text>
+              <Text color={used > 80 ? 'red' : used > 50 ? 'yellow' : 'green'}>{'█'.repeat(n) + '░'.repeat(10 - n)}</Text>
+              <Text dimColor> {used.toFixed(0)}%{r.resetsAt ? ` · ${L.reset} ${when(r.resetsAt)}` : ''}</Text>
+            </Text>
+          )
+        })}
         <Text bold color="cyan">📁 {s.root.split('/').pop()}</Text>
         {s.isRepo ? (
           <Text>
             <Text color="magenta"> {s.branch}</Text>
-            <Text dimColor>  {changed.length ? `변경 ${changed.length}개` : '깨끗함 ✓'}</Text>
+            <Text dimColor>  {changed.length ? L.changed(changed.length) : L.clean}</Text>
           </Text>
         ) : (
-          <Text dimColor>git 저장소 아님</Text>
+          <Text dimColor>{L.notRepo}</Text>
         )}
-        <Text color="green">▶ {current || '(아직 작업 없음)'}</Text>
+        <Text color="green">▶ {current || L.nothing}</Text>
         <Text dimColor>────────────────</Text>
         {lines.slice(0, rows).map(l => {
           const st = s.status[l.path]
@@ -309,10 +398,10 @@ export const register: Register = on => {
             </Box>
           )
         })}
-        {lines.length > rows && <Text dimColor>… {lines.length - rows}개 더</Text>}
+        {lines.length > rows && <Text dimColor>{L.more(lines.length - rows)}</Text>}
         <Text dimColor>────────────────</Text>
-        <Text dimColor>⌨ ctrl+x tab 패널 포커스 · ↑↓ 이동 · Enter 열기/접기</Text>
-        <Text dimColor>  📂 폴더 클릭 접기/펼치기 · 파일 클릭 코드 보기 · @ 프롬프트에 넣기</Text>
+        <Text dimColor>{L.keys1}</Text>
+        <Text dimColor>{L.keys2}</Text>
       </Box>
     )
   })
@@ -320,19 +409,23 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: VIEW }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const v = await read($, viewing)
-    if (!v) return <Text dimColor>트리에서 파일을 클릭하세요.</Text>
+    if (!v) return <Text dimColor>{L.pick}</Text>
     const all = v.text.split('\n')
-    const room = Math.max(5, (e.viewport?.rows ?? 30) - 5)
+    const room = Math.max(5, (e.viewport?.rows ?? 30) - 6)
     const top = Math.min(v.top, Math.max(0, all.length - room))
     const w = String(all.length).length
     const move = (d: number) => () =>
       void update($, viewing, x => (x ? { ...x, top: Math.max(0, Math.min(x.top + d, all.length - room)) } : x))
     return (
       <Box flexDirection="column">
+        <Box flexDirection="row" justifyContent="space-between">
+          <Box flexDirection="row" flexShrink={1}>
+            <Text>{iconOf(v.path.split('/').pop() ?? '', false, false)} </Text>
+            <Text bold color="cyan" wrap="truncate-start">{v.path}</Text>
+          </Box>
+          <Button key="close" label=" ✕ " hotkey="x" plain role="dismiss" onPress={() => void $.ui.close({ id: VIEW })} />
+        </Box>
         <Box flexDirection="row">
-          <Text>{iconOf(v.path.split('/').pop() ?? '', false, false)} </Text>
-          <Text bold color="cyan">{v.path}</Text>
-          <Text dimColor>  {top + 1}–{Math.min(top + room, all.length)} / {all.length}줄  </Text>
           <Button key="top" label="⤒" hotkey="g" plain onPress={move(-all.length)} />
           <Text> </Text>
           <Button key="pgup" label="▲" hotkey="k" plain onPress={move(-room)} />
@@ -342,14 +435,13 @@ export const register: Register = on => {
           <Button key="end" label="⤓" hotkey="e" plain onPress={move(all.length)} />
           <Text> </Text>
           <Button key="at" label="@" hotkey="a" plain onPress={() => void $.prompt.fill({ text: `@${v.path} `, mode: 'insert' })} />
-          <Text> </Text>
-          <Button key="close" label="✕" hotkey="x" plain role="dismiss" onPress={() => void $.ui.close({ id: VIEW })} />
+          <Text dimColor>  {top + 1}–{Math.min(top + room, all.length)} / {all.length} {L.lines}</Text>
         </Box>
-        <Text dimColor>⌨ g 맨위 · k 위 · j 아래 · e 맨끝 · a @넣기 · x 닫기</Text>
+        <Text dimColor wrap="truncate-end">{L.vkeys}</Text>
         {all.slice(top, top + room).map((line, i) => (
           <Box flexDirection="row" key={String(top + i)}>
             <Text dimColor>{String(top + i + 1).padStart(w)} │ </Text>
-            <Text>{line.replace(/	/g, '  ') || ' '}</Text>
+            <Text>{line.replace(/\t/g, '  ') || ' '}</Text>
           </Box>
         ))}
       </Box>

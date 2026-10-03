@@ -1,16 +1,20 @@
 # 🌳 choitree
 
-**Claude Code 안에서 파일 트리·git 상태·Claude의 작업 위치·토큰 사용량을 한눈에 보여주는 라이브 패널**
+**English** · [한국어](README.ko.md) · [中文](README.zh.md) · [日本語](README.ja.md)
 
-만든 사람: [choidev](https://choidev.com)
+**A live pane for Claude Code that shows the file tree, git status, where Claude is working, token usage, and your usage limits, scoped to the current project.**
+
+Made by [choidev](https://choidev.com)
 
 ```
- ▐▛███▜▌   ✻ 열심히 작업 중… 12s
+ ▐▛███▜▌   ✻ Working hard… 12s
 ▝▜█████▛▘  🔧 Edit
   ▘▘ ▝▝    ↑182.4k ↓3.1k $0.42
-컨텍스트 ███░░░░░░░ 31% (62.0k/200.0k)
+Context ███░░░░░░░ 31% (62.0k/200.0k)
+5-hour  ████░░░░░░ 41% · resets 18:00
+Weekly  ██░░░░░░░░ 17% · resets 10/7 09:00
 📁 my-app
- main  변경 3개
+ main  3 changed
 ▶ src/App.tsx
 ────────────────
 •   📂 src/
@@ -19,70 +23,107 @@
 ?     🎨 theme.css
     📁 public/ (12)
     📦 package.json
-    📘 README.md
 ```
 
-## 기능
+## Features
 
-- **파일 트리**: git이 추적하는 파일 기준. 작업 중·변경됨·최근에 연 폴더만 자동으로 펼치고 나머지는 `(파일 수)`로 접습니다.
-- **git 상태**: 브랜치, 변경 파일 수, 파일별 아이콘 (`●` 수정 · `+` 추가 · `?` 새 파일 · `✖` 삭제 · `→` 이름 변경).
-- **Claude 작업 위치**: Claude가 지금 읽거나 고치는 파일에 `▶`, 최근에 다룬 파일에 `← Read`/`← Edit`.
-- **Claude 캐릭터**: 작업하는 동안 움직이고, 사용 중인 도구와 경과 시간을 보여줍니다.
-- **토큰·비용**: 입력(↑)·출력(↓) 토큰, 세션 비용, 컨텍스트 사용률 막대, 사용 한도.
-- **파일 아이콘**: 60가지가 넘는 언어와 설정·문서·미디어 파일.
-- **코드 뷰어**: 파일을 클릭하면 줄 번호와 함께 옆 패널에 열립니다.
-- **자동 새로고침**: 편집이나 셸 명령이 끝날 때마다 git 상태를 다시 읽습니다.
+- **File tree**: built from the files git tracks. Folders that Claude is working in, that changed, or that were opened recently unfold by themselves. The others fold to one line with a file count.
+- **Git status**: branch, number of changed files, and a mark per file (`●` modified, `+` added, `?` untracked, `✖` deleted, `→` renamed).
+- **Where Claude is working**: `▶` marks the file Claude is reading or editing now. Files it touched recently show `← Read` / `← Edit`.
+- **Claude character**: moves while Claude works, and shows the current tool and elapsed time.
+- **Tokens and limits**: input (↑) and output (↓) tokens, session cost, a context bar, and every usage limit Claude Code reports (5-hour, weekly, per-model weekly, spend) with reset times.
+- **File icons**: 60+ languages plus config, docs, media and archive files.
+- **Code viewer**: click a file to open it with line numbers in a second pane.
+- **Languages**: Korean, English, Chinese, Japanese.
+- **Current project only**: see [Privacy and scope](#privacy-and-scope).
 
-## 설치
+## Install
 
-Claude Code에서:
+In Claude Code:
 
 ```
 /plugin marketplace add choidevhi/choitree
 /plugin install choitree@choitree
 ```
 
-또는 터미널에서:
+Or in a terminal:
 
 ```bash
 claude plugin marketplace add choidevhi/choitree
 claude plugin install choitree@choitree
 ```
 
-## 사용법
+## Usage
 
-- 터미널 폭이 144칸 이상이면 세션 시작 때 자동으로 열립니다.
-- 직접 열려면 `/choitree`.
+- The pane opens by itself at session start when the terminal is at least 144 columns wide.
+- Open it yourself with `/choitree`.
 
-### 마우스
+### Mouse
 
-| 동작 | 결과 |
+| Action | Result |
 |---|---|
-| 폴더 클릭 | 접기 / 펼치기 |
-| 파일 이름 클릭 | 코드 뷰어로 열기 |
-| 파일 옆 `@` 클릭 | 프롬프트에 `@경로` 넣기 |
+| Click a folder | Fold / unfold |
+| Click a file name | Open in the code viewer |
+| Click `@` next to a file | Insert `@path` into the prompt |
+| Click `✕` in the viewer | Close the viewer |
 
-### 키보드
+### Keyboard
 
-| 키 | 동작 |
+| Key | Action |
 |---|---|
-| `ctrl+x tab` | 패널로 포커스 이동 |
-| `↑` `↓` / `Enter` | 항목 이동 / 열기·접기 |
+| `ctrl+x tab` | Move focus to the pane |
+| `↑` `↓` / `Enter` | Move / open or fold |
 
-코드 뷰어 안에서:
+In the code viewer:
 
-| 키 | 동작 |
+| Key | Action |
 |---|---|
-| `g` / `e` | 맨 위 / 맨 끝 |
-| `k` / `j` | 한 페이지 위 / 아래 |
-| `a` | 프롬프트에 `@경로` 넣기 |
-| `x` | 닫기 |
+| `g` / `e` | Top / end |
+| `k` / `j` | Page up / down |
+| `a` | Insert `@path` into the prompt |
+| `x` / `Esc` | Close |
 
-## 요구 사항
+### Language
 
-- 플러그인 훅(`hooks/hooks.json`의 `modules`)을 지원하는 Claude Code
-- 저장소 기능을 쓰려면 `git`. git 저장소가 아니면 맨 위 단계 목록만 보여 줍니다.
+The pane follows Claude Code's `language` setting by default. To pick one, set the plugin's `language` option to `ko`, `en`, `zh` or `ja` in `/config`.
 
-## 라이선스
+## Privacy and scope
+
+- **Nothing leaves your computer.** choitree makes no network requests and sends no data anywhere. Everything it reads stays in the pane.
+- **Current project only.** The tree, git status and code viewer cover only the session's project folder (`$.session.root()`). If the git repository starts above that folder, files outside it are left out. The code viewer resolves symbolic links and refuses any file whose real path is outside the project. Files Claude touches outside the project are not shown.
+- **Usage figures** (tokens, cost, context, limits) come from Claude Code itself through `$.session.usage()` and the model responses of the session. choitree does not call any API for them.
+
+### Programs it runs
+
+choitree runs only `git`, always with fixed arguments, in the project folder. It never runs a command built from user input or file contents.
+
+| Command | Why |
+|---|---|
+| `git rev-parse --show-prefix` | Check whether the project is in a git repository, and where the project sits inside it |
+| `git branch --show-current` | Show the branch name |
+| `git ls-files` | List the tracked files for the tree |
+| `git status --porcelain=v1 -uall -- .` | Show changed and untracked files in the project |
+
+If `git` is missing or the folder is not a repository, it lists the top level of the project folder instead.
+
+### What each hook does
+
+| Hook | What it does |
+|---|---|
+| `session.start` | Reads the language setting, registers `/choitree`, scans the project, opens the pane |
+| `command.run` (`/choitree`) | Rescans and opens the pane |
+| `turn.start` / `turn.complete` | Starts and stops the character animation; rescans git status when a turn ends |
+| `turn.step` | Adds up the token counts of each model response. The response itself is passed on unchanged |
+| `tool.call` | Notes which project file a tool works on (for `▶` and `← Read`), and rescans after edits and shell commands. It never changes, blocks or delays the tool call |
+| `ui.render` (`choitree`, `choitree-view`) | Draws the tree pane and the code viewer |
+
+choitree adds one slash command (`/choitree`). It adds no tools, agents, MCP servers or system prompt text.
+
+## Requirements
+
+- A Claude Code version that supports plugin hook modules (`modules` in `hooks/hooks.json`)
+- `git` for the repository features
+
+## License
 
 MIT © [choidev](https://choidev.com)
