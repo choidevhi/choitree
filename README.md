@@ -28,7 +28,7 @@ Weekly  ██░░░░░░░░ 17% · resets 10/7 09:00
 ## Features
 
 - **File tree**: built from the files git tracks. Folders that Claude is working in, that changed, or that were opened recently unfold by themselves. The others fold to one line with a file count.
-- **Session**: model in use and total session time.
+- **Session**: model in use, and the total time Claude has actually worked in this project (turn time only, added up across sessions; idle time is not counted).
 - **Git status**: branch, remote branch with commits ahead/behind, last commit, number of changed files, and a mark per file (`●` modified, `+` added, `?` untracked, `✖` deleted, `→` renamed).
 - **Where Claude is working**: `▶` marks the file Claude is reading or editing now. Files it touched recently show `← Read` / `← Edit`.
 - **Claude character**: moves while Claude works, and shows the current tool and elapsed time.
@@ -78,7 +78,7 @@ The pane is in English by default. To change it, set the plugin's `language` opt
 
 ## Privacy and scope
 
-**choitree sends nothing anywhere.** It makes no network requests, writes no files, and keeps no data after the session. Everything it reads is shown in the pane and nowhere else.
+**choitree sends nothing anywhere.** It makes no network requests, and writes no files. The only thing it keeps between sessions is the work-time total below, in Claude Code's local plugin store. Everything it reads is shown in the pane and nowhere else.
 
 ### What it reads and where it goes
 
@@ -90,6 +90,7 @@ The pane is in English by default. To change it, set the plugin's `language` opt
 | `tool.call` hook input | The file path a tool works on, kept only if it is inside the project | Drawn in the pane only (`▶`, `← Read`) |
 | `$.session.model()` | The name of the model the session uses, as `/model` shows it | Drawn in the pane only |
 | `$.session.usage()` / `turn.step` result | Token counts, session cost, session start time, context size and usage limits that Claude Code already has | Drawn in the pane only |
+| `$.store.get` / `$.store.set` | One number per project: the total time Claude has actually worked there (from each turn's start to its end), keyed by the project path | Saved in Claude Code's local plugin store on your computer, so it adds up across sessions. Never sent anywhere |
 | `options.language` | The plugin's own `language` option | Picks the pane language |
 | `$.prompt.fill` | Nothing read. Writes `@path` into your prompt box when you click a file | Your prompt box |
 

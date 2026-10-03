@@ -25,7 +25,21 @@ const state = {
   opened: {} as Record<string, boolean>,
   activity: { busy: false, since: 0, frame: 0, tool: '' } as Activity,
   tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, steps: 0 } as Tokens,
+  // 이 프로젝트에서 Claude가 실제로 일한 시간(턴 시작~끝)의 누적, 세션을 넘어 저장
+  workMs: 0,
 }
+const workKey = (root: string) => 'work:' + norm(root).toLowerCase()
+
+async function loadWork($: any) {
+  const saved = await $.store.get(workKey(await $.session.root()))
+  state.workMs = Number(saved ?? 0) || 0
+  redraw($)
+}
+
+async function saveWork($: any) {
+  await $.store.set(workKey(await $.session.root()), state.workMs)
+}
+
 function redraw($: any) {
   $.ui.invalidate('ui.render')
 }
@@ -48,7 +62,7 @@ const T = {
     cmd: '파일 트리·git 상태·작업 위치 패널 열기', opened: 'choitree 패널을 열었습니다.', scanning: '스캔 중…',
     verbs: ['생각하는 중', '코드 읽는 중', '열심히 작업 중', '두드리는 중', '고민하는 중'], idle: '대기 중 zZ',
     steps: (n: number) => `요청 ${n}회`, context: '컨텍스트', limit: '한도', reset: '리셋',
-    changed: (n: number) => `변경 ${n}개`, clean: '깨끗함 ✓', noUpstream: '원격 없음',  notRepo: 'git 저장소 아님', nothing: '(아직 작업 없음)',
+    changed: (n: number) => `변경 ${n}개`, clean: '깨끗함 ✓', noUpstream: '원격 없음', work: '작업',  notRepo: 'git 저장소 아님', nothing: '(아직 작업 없음)',
     more: (n: number) => `… ${n}개 더`, keys1: '⌨ ctrl+x tab 패널 포커스 · ↑↓ 이동 · Enter 열기/접기',
     keys2: '  📂 폴더 클릭 접기/펼치기 · 파일 클릭 프롬프트에 @경로',
     kinds: { five_hour: '5시간', seven_day: '주간', seven_day_opus: '주간Opus', seven_day_sonnet: '주간Sonnet', spend_limit: '지출' } as Record<string, string>,
@@ -57,7 +71,7 @@ const T = {
     cmd: 'Open the file tree / git status / work location pane', opened: 'choitree pane opened.', scanning: 'Scanning…',
     verbs: ['Thinking', 'Reading code', 'Working hard', 'Typing away', 'Pondering'], idle: 'Idle zZ',
     steps: (n: number) => `${n} requests`, context: 'Context', limit: 'Limit', reset: 'resets',
-    changed: (n: number) => `${n} changed`, clean: 'clean ✓', noUpstream: 'no upstream',  notRepo: 'not a git repository', nothing: '(no work yet)',
+    changed: (n: number) => `${n} changed`, clean: 'clean ✓', noUpstream: 'no upstream', work: 'worked',  notRepo: 'not a git repository', nothing: '(no work yet)',
     more: (n: number) => `… ${n} more`, keys1: '⌨ ctrl+x tab focus pane · ↑↓ move · Enter open/fold',
     keys2: '  📂 click folder to fold · click file to insert @path',
     kinds: { five_hour: '5-hour', seven_day: 'Weekly', seven_day_opus: 'Wk Opus', seven_day_sonnet: 'Wk Sonnet', spend_limit: 'Spend' } as Record<string, string>,
@@ -66,7 +80,7 @@ const T = {
     cmd: '打开文件树 / git 状态 / 工作位置面板', opened: '已打开 choitree 面板。', scanning: '扫描中…',
     verbs: ['思考中', '阅读代码中', '努力工作中', '敲代码中', '琢磨中'], idle: '待机中 zZ',
     steps: (n: number) => `请求 ${n} 次`, context: '上下文', limit: '额度', reset: '重置',
-    changed: (n: number) => `${n} 个变更`, clean: '干净 ✓', noUpstream: '无上游',  notRepo: '不是 git 仓库', nothing: '(尚无工作)',
+    changed: (n: number) => `${n} 个变更`, clean: '干净 ✓', noUpstream: '无上游', work: '工作',  notRepo: '不是 git 仓库', nothing: '(尚无工作)',
     more: (n: number) => `… 还有 ${n} 个`, keys1: '⌨ ctrl+x tab 聚焦面板 · ↑↓ 移动 · Enter 打开/折叠',
     keys2: '  📂 点击文件夹折叠/展开 · 点击文件插入 @路径',
     kinds: { five_hour: '5小时', seven_day: '每周', seven_day_opus: '每周Opus', seven_day_sonnet: '每周Sonnet', spend_limit: '支出' } as Record<string, string>,
@@ -75,7 +89,7 @@ const T = {
     cmd: 'ファイルツリー・git 状態・作業位置パネルを開く', opened: 'choitree パネルを開きました。', scanning: 'スキャン中…',
     verbs: ['考え中', 'コードを読み中', 'がんばって作業中', 'タイプ中', '悩み中'], idle: '待機中 zZ',
     steps: (n: number) => `リクエスト ${n} 回`, context: 'コンテキスト', limit: '上限', reset: 'リセット',
-    changed: (n: number) => `変更 ${n} 件`, clean: 'クリーン ✓', noUpstream: '上流なし',  notRepo: 'git リポジトリではありません', nothing: '(まだ作業なし)',
+    changed: (n: number) => `変更 ${n} 件`, clean: 'クリーン ✓', noUpstream: '上流なし', work: '作業',  notRepo: 'git リポジトリではありません', nothing: '(まだ作業なし)',
     more: (n: number) => `… 他 ${n} 件`, keys1: '⌨ ctrl+x tab パネルにフォーカス · ↑↓ 移動 · Enter 開く/たたむ',
     keys2: '  📂 フォルダをクリックで開閉 · ファイルをクリックで @パス を挿入',
     kinds: { five_hour: '5時間', seven_day: '週間', seven_day_opus: '週Opus', seven_day_sonnet: '週Sonnet', spend_limit: '支出' } as Record<string, string>,
@@ -84,8 +98,9 @@ const T = {
 let L: (typeof T)['ko'] = T.en
 
 const dur = (ms: number) => {
-  const m = Math.floor(ms / 60000)
-  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`
+  const sec = Math.floor(ms / 1000)
+  const m = Math.floor(sec / 60)
+  return m < 1 ? `${sec}s` : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`
 }
 
 // 리셋 시각: 오늘이면 HH:MM, 아니면 MM-DD HH:MM (현지 시간)
@@ -216,12 +231,14 @@ export const register: Register = (on, options) => {
     L = T[pickLang(String((options as any)?.language ?? 'en'))]
     await $.command.register({ name: 'choitree', description: L.cmd })
     void refresh($)
+    void loadWork($)
     $.clock.every(30000, () => $.ui.invalidate('ui.render'))
     void $.ui.open({ id: PANE, title: 'choitree' })
     return next(e)
   })
 
   on('turn.start', async ($, e, next) => {
+    if ((e as any).agentId !== undefined) return next(e)
     state.activity = { ...state.activity, busy: true, since: Date.now(), tool: '' }
     redraw($)
     ticker?.cancel()
@@ -233,6 +250,9 @@ export const register: Register = (on, options) => {
   })
 
   on('turn.complete', async ($, e, next) => {
+    if ((e as any).agentId !== undefined || !state.activity.busy) return next(e)
+    state.workMs += Date.now() - state.activity.since
+    void saveWork($)
     ticker?.cancel()
     ticker = undefined
     state.activity = { ...state.activity, busy: false, tool: '' }
@@ -291,7 +311,7 @@ export const register: Register = (on, options) => {
     const body = act.busy ? BODY[Math.floor(act.frame / 2) % BODY.length]! : IDLE
     const secs = act.busy ? Math.floor((Date.now() - act.since) / 1000) : 0
     const model = await $.session.model().catch(() => '')
-    const total = us?.startedAt ? dur(Date.now() - us.startedAt) : ''
+    const total = dur(state.workMs + (act.busy ? Date.now() - act.since : 0))
     const ctx = us?.context
     const pct = ctx?.percent ?? (ctx?.tokens ? (ctx.tokens / ctx.window) * 100 : 0)
     const bar = '█'.repeat(Math.round(pct / 10)) + '░'.repeat(10 - Math.round(pct / 10))
@@ -347,7 +367,7 @@ export const register: Register = (on, options) => {
             <Text dimColor>{act.busy && act.tool ? `🔧 ${act.tool}` : L.steps(tk.steps)}</Text>
             <Text>
               <Text color="#D97757">🧠 {model || '?'}</Text>
-              {total && <Text dimColor>  ⏱ {total}</Text>}
+              <Text dimColor>  ⏱ {L.work} {total}</Text>
             </Text>
             <Text>
               <Text color="cyan">↑{fmt(tk.input + tk.cacheRead + tk.cacheWrite)}</Text>
