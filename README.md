@@ -28,7 +28,8 @@ Weekly  ██░░░░░░░░ 17% · resets 10/7 09:00
 ## Features
 
 - **File tree**: built from the files git tracks. Folders that Claude is working in, that changed, or that were opened recently unfold by themselves. The others fold to one line with a file count.
-- **Git status**: branch, number of changed files, and a mark per file (`●` modified, `+` added, `?` untracked, `✖` deleted, `→` renamed).
+- **Session**: model in use and total session time.
+- **Git status**: branch, remote branch with commits ahead/behind, last commit, number of changed files, and a mark per file (`●` modified, `+` added, `?` untracked, `✖` deleted, `→` renamed).
 - **Where Claude is working**: `▶` marks the file Claude is reading or editing now. Files it touched recently show `← Read` / `← Edit`.
 - **Claude character**: moves while Claude works, and shows the current tool and elapsed time.
 - **Tokens and limits**: input (↑) and output (↓) tokens, session cost, a context bar, and every usage limit Claude Code reports (5-hour, weekly, per-model weekly, spend) with reset times.
@@ -84,10 +85,11 @@ The pane is in English by default. To change it, set the plugin's `language` opt
 | Call | What it reads | Where it goes |
 |---|---|---|
 | `$.session.root()` | The path of the session's project folder | Used to limit every other read to that folder |
-| `$.process.run` (`git` only, see below) | File names, branch name and git status of the project folder | Drawn in the pane only |
+| `$.process.run` (`git` only, see below) | File names, branch, remote branch, ahead/behind counts, last commit subject and git status of the project folder | Drawn in the pane only |
 | `$.fs.list` | File and folder names at the top of the project folder, only when it is not a git repository | Drawn in the pane only |
 | `tool.call` hook input | The file path a tool works on, kept only if it is inside the project | Drawn in the pane only (`▶`, `← Read`) |
-| `$.session.usage()` / `turn.step` result | Token counts, session cost, context size and usage limits that Claude Code already has | Drawn in the pane only |
+| `$.session.model()` | The name of the model the session uses, as `/model` shows it | Drawn in the pane only |
+| `$.session.usage()` / `turn.step` result | Token counts, session cost, session start time, context size and usage limits that Claude Code already has | Drawn in the pane only |
 | `options.language` | The plugin's own `language` option | Picks the pane language |
 | `$.prompt.fill` | Nothing read. Writes `@path` into your prompt box when you click a file | Your prompt box |
 
@@ -103,6 +105,9 @@ choitree runs only `git`, in the project folder. Each command is written out in 
 |---|---|
 | `git rev-parse --show-prefix` | Check whether the project is in a git repository, and where the project sits inside it |
 | `git branch --show-current` | Show the branch name |
+| `git rev-parse --abbrev-ref --symbolic-full-name @{upstream}` | Show the remote branch it tracks |
+| `git rev-list --left-right --count @{upstream}...HEAD` | Show commits ahead (↑) and behind (↓) the remote |
+| `git log -1 --format=%h %s` | Show the last commit's short hash and subject |
 | `git ls-files` | List the tracked files for the tree |
 | `git status --porcelain=v1 -uall -- .` | Show changed and untracked files in the project |
 

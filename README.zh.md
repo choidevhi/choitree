@@ -21,7 +21,8 @@
 ## 功能
 
 - **文件树**：基于 git 跟踪的文件。Claude 正在工作、有变更或最近打开过的文件夹会自动展开，其余折叠为一行并显示文件数。
-- **git 状态**：分支、变更文件数、每个文件的标记（`●` 修改 · `+` 新增 · `?` 未跟踪 · `✖` 删除 · `→` 重命名）。
+- **会话**：正在使用的模型和总时长。
+- **git 状态**：分支、远程分支及领先/落后提交数、最后一次提交、变更文件数、每个文件的标记（`●` 修改 · `+` 新增 · `?` 未跟踪 · `✖` 删除 · `→` 重命名）。
 - **Claude 工作位置**：`▶` 标出 Claude 正在读取或编辑的文件，最近处理过的文件显示 `← Read` / `← Edit`。
 - **Claude 角色**：工作时会动，并显示当前工具和已用时间。
 - **token 与额度**：输入(↑)/输出(↓) token、会话费用、上下文进度条，以及 Claude Code 报告的所有使用额度（5 小时、每周、按模型每周、支出）和重置时间。
@@ -54,6 +55,7 @@
 | `$.process.run`（仅 `git`，见下文） | 项目文件夹的文件名、分支名和 git 状态 | 仅显示在面板中 |
 | `$.fs.list` | 仅在不是 git 仓库时，项目文件夹顶层的文件和文件夹名 | 仅显示在面板中 |
 | `tool.call` hook 输入 | 工具处理的文件路径，仅保留项目内的 | 仅显示在面板中（`▶`、`← Read`） |
+| `$.session.model()` | 会话使用的模型名（与 `/model` 显示一致） | 仅显示在面板中 |
 | `$.session.usage()` / `turn.step` 结果 | Claude Code 已有的 token 数、会话费用、上下文大小和使用额度 | 仅显示在面板中 |
 | `options.language` | 插件自身的 `language` 选项 | 选择面板语言 |
 | `$.prompt.fill` | 不读取。点击文件时把 `@路径` 写入提示框 | 提示输入框 |
@@ -64,7 +66,7 @@
 
 ### 运行的程序
 
-只在项目文件夹中运行 `git`，每条命令都以固定文本完整写在调用中（`$.process.run(['git', ...], { cwd: root })`）：`git rev-parse --show-prefix`（检查是否在仓库中）、`git branch --show-current`（分支名）、`git ls-files`（文件列表）、`git status --porcelain=v1 -uall -- .`（变更文件）。
+只在项目文件夹中运行 `git`，每条命令都以固定文本完整写在调用中（`$.process.run(['git', ...], { cwd: root })`）：`git rev-parse --show-prefix`（检查是否在仓库中）、`git branch --show-current`（分支名）、`git rev-parse --abbrev-ref --symbolic-full-name @{upstream}`（跟踪的远程分支）、`git rev-list --left-right --count @{upstream}...HEAD`（领先/落后的提交数）、`git log -1 --format=%h %s`（最后一次提交）、`git ls-files`（文件列表）、`git status --porcelain=v1 -uall -- .`（变更文件）。
 
 ### 各个 hook 的作用
 
