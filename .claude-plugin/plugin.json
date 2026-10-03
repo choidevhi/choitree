@@ -1,6 +1,6 @@
 {
   "name": "choitree",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Live pane for Claude Code: file tree, git status, where Claude is working, tokens and usage limits, scoped to the current project",
   "author": {
     "name": "choidevhi",
@@ -22,15 +22,8 @@
     "language": {
       "type": "string",
       "title": "Language",
-      "description": "Pane language: auto follows the Claude Code language setting (ko, en, zh, ja)",
-      "default": "auto",
-      "options": [
-        "auto",
-        "ko",
-        "en",
-        "zh",
-        "ja"
-      ]
+      "description": "Pane language: auto (follow the Claude Code language setting), ko, en, zh or ja",
+      "default": "auto"
     }
   },
   "types": "./types/index.d.ts"
