@@ -26,9 +26,7 @@ const state = {
   activity: { busy: false, since: 0, frame: 0, tool: '' } as Activity,
   tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, steps: 0 } as Tokens,
 }
-type State = typeof state
-const set = <K extends keyof State>($: any, key: K, fn: (v: State[K]) => State[K]) => {
-  state[key] = fn(state[key])
+function redraw($: any) {
   $.ui.invalidate('ui.render')
 }
 let ticker: { cancel: () => void } | undefined
@@ -114,7 +112,7 @@ const inside = (root: string, p: string) => {
 }
 
 // 세션의 프로젝트 루트 아래만 본다. git 저장소가 더 위에 있어도 루트 밖 파일은 넣지 않는다.
-const scan = async ($: any): Promise<Snapshot> => {
+async function scan($: any): Promise<Snapshot> {
   const root = norm(await $.session.root())
   const run = (p: Promise<any>) => p.catch(() => null)
   const pre = await run($.process.run(['git', 'rev-parse', '--show-prefix'], { cwd: root }))
@@ -158,9 +156,9 @@ const scan = async ($: any): Promise<Snapshot> => {
   return { root, branch: '', upstream: '', ahead: 0, behind: 0, lastCommit: '', files, status: {}, isRepo: false }
 }
 
-const refresh = async ($: any) => {
-  const s = await scan($)
-  set($, 'snap', () => s)
+async function refresh($: any) {
+  state.snap = await scan($)
+  redraw($)
 }
 
 const ICON: Record<string, [string, string]> = {
@@ -224,16 +222,21 @@ export const register: Register = (on, options) => {
   })
 
   on('turn.start', async ($, e, next) => {
-    set($, 'activity', a => ({ ...a, busy: true, since: Date.now(), tool: '' }))
+    state.activity = { ...state.activity, busy: true, since: Date.now(), tool: '' }
+    redraw($)
     ticker?.cancel()
-    ticker = $.clock.every(250, () => set($, 'activity', a => ({ ...a, frame: a.frame + 1 })))
+    ticker = $.clock.every(250, () => {
+      state.activity = { ...state.activity, frame: state.activity.frame + 1 }
+      redraw($)
+    })
     return next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
     ticker?.cancel()
     ticker = undefined
-    set($, 'activity', a => ({ ...a, busy: false, tool: '' }))
+    state.activity = { ...state.activity, busy: false, tool: '' }
+    redraw($)
     void refresh($)
     return next(e)
   })
@@ -242,13 +245,15 @@ export const register: Register = (on, options) => {
     const r = yield* next(e)
     const u = (r as any)?.usage
     if (u) {
-      set($, 'tokens', t => ({
+      const t = state.tokens
+      state.tokens = {
         input: t.input + (u.input_tokens ?? 0),
         output: t.output + (u.output_tokens ?? 0),
         cacheRead: t.cacheRead + (u.cache_read_input_tokens ?? 0),
         cacheWrite: t.cacheWrite + (u.cache_creation_input_tokens ?? 0),
         steps: t.steps + 1,
-      }))
+      }
+      redraw($)
     }
     return r
   })
@@ -264,9 +269,11 @@ export const register: Register = (on, options) => {
     const p = a.file_path ?? a.notebook_path ?? (a.tool === 'Grep' || a.tool === 'Glob' ? a.path : undefined)
     if (typeof p === 'string' && inside(norm(await $.session.root()), norm(p))) {
       const t: Touch = { path: norm(p), tool: a.tool, at: Date.now() }
-      set($, 'touches', l => [...l.filter(x => x.path !== t.path), t].slice(-30))
+      state.touches = [...state.touches.filter(x => x.path !== t.path), t].slice(-30)
+      redraw($)
     }
-    set($, 'activity', x => ({ ...x, tool: a.tool }))
+    state.activity = { ...state.activity, tool: a.tool }
+    redraw($)
     const ran = await next(e)
     if (['Edit', 'Write', 'NotebookEdit', 'Bash', 'PowerShell'].includes(a.tool)) void refresh($)
     return ran
@@ -407,7 +414,7 @@ export const register: Register = (on, options) => {
                 dimColor={!isCur && !t && !l.isDir && !st}
                 onPress={() =>
                   l.isDir
-                    ? set($, 'opened', o => ({ ...o, [l.path]: !hot(l.path) }))
+                    ? void ((state.opened = { ...state.opened, [l.path]: !hot(l.path) }), redraw($))
                     : void $.prompt.fill({ text: `@${l.path} `, mode: 'insert' })
                 }
               />
