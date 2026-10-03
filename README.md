@@ -33,7 +33,6 @@ Weekly  ██░░░░░░░░ 17% · resets 10/7 09:00
 - **Claude character**: moves while Claude works, and shows the current tool and elapsed time.
 - **Tokens and limits**: input (↑) and output (↓) tokens, session cost, a context bar, and every usage limit Claude Code reports (5-hour, weekly, per-model weekly, spend) with reset times.
 - **File icons**: 60+ languages plus config, docs, media and archive files.
-- **Code viewer**: click a file to open it with line numbers in a second pane.
 - **Languages**: Korean, English, Chinese, Japanese.
 - **Current project only**: see [Privacy and scope](#privacy-and-scope).
 
@@ -63,9 +62,7 @@ claude plugin install choitree@choitree
 | Action | Result |
 |---|---|
 | Click a folder | Fold / unfold |
-| Click a file name | Open in the code viewer |
-| Click `@` next to a file | Insert `@path` into the prompt |
-| Click `✕` in the viewer | Close the viewer |
+| Click a file | Insert `@path` into the prompt |
 
 ### Keyboard
 
@@ -74,23 +71,14 @@ claude plugin install choitree@choitree
 | `ctrl+x tab` | Move focus to the pane |
 | `↑` `↓` / `Enter` | Move / open or fold |
 
-In the code viewer:
-
-| Key | Action |
-|---|---|
-| `g` / `e` | Top / end |
-| `k` / `j` | Page up / down |
-| `a` | Insert `@path` into the prompt |
-| `x` / `Esc` | Close |
-
 ### Language
 
 The pane follows Claude Code's `language` setting by default. To pick one, set the plugin's `language` option to `ko`, `en`, `zh` or `ja` in `/config`.
 
 ## Privacy and scope
 
-- **Nothing leaves your computer.** choitree makes no network requests and sends no data anywhere. Everything it reads stays in the pane.
-- **Current project only.** The tree, git status and code viewer cover only the session's project folder (`$.session.root()`). If the git repository starts above that folder, files outside it are left out. The code viewer resolves symbolic links and refuses any file whose real path is outside the project. Files Claude touches outside the project are not shown.
+- **Nothing leaves your computer.** choitree makes no network requests and sends no data anywhere. It never reads file contents; it only lists file names.
+- **Current project only.** The tree and git status cover only the session's project folder (`$.session.root()`). If the git repository starts above that folder, files outside it are left out. Files Claude touches outside the project are not shown.
 - **Usage figures** (tokens, cost, context, limits) come from Claude Code itself through `$.session.usage()` and the model responses of the session. choitree does not call any API for them.
 
 ### Programs it runs
@@ -115,7 +103,7 @@ If `git` is missing or the folder is not a repository, it lists the top level of
 | `turn.start` / `turn.complete` | Starts and stops the character animation; rescans git status when a turn ends |
 | `turn.step` | Adds up the token counts of each model response. The response itself is passed on unchanged |
 | `tool.call` | Notes which project file a tool works on (for `▶` and `← Read`), and rescans after edits and shell commands. It never changes, blocks or delays the tool call |
-| `ui.render` (`choitree`, `choitree-view`) | Draws the tree pane and the code viewer |
+| `ui.render` (`choitree`) | Draws the pane |
 
 choitree adds one slash command (`/choitree`). It adds no tools, agents, MCP servers or system prompt text.
 

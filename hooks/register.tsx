@@ -1,16 +1,13 @@
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import type { Activity, Snapshot, Tokens, Touch, View } from '../types'
+import type { Activity, Snapshot, Tokens, Touch } from '../types'
 
 const PANE = 'choitree'
 const touches = atom({ plugin: 'choitree', key: 'touches' } as const, [] as Touch[])
 const snap = atom({ plugin: 'choitree', key: 'snap' } as const, null as Snapshot | null)
 
 const opened = atom({ plugin: 'choitree', key: 'opened' } as const, {} as Record<string, boolean>)
-
-const VIEW = 'choitree-view'
-const viewing = atom({ plugin: 'choitree', key: 'viewing' } as const, null as View | null)
 
 const activity = atom({ plugin: 'choitree', key: 'activity' } as const, { busy: false, since: 0, frame: 0, tool: '' } as Activity)
 const tokens = atom({ plugin: 'choitree', key: 'tokens' } as const, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, steps: 0 } as Tokens)
@@ -35,10 +32,8 @@ const T = {
     steps: (n: number) => `요청 ${n}회`, context: '컨텍스트', limit: '한도', reset: '리셋',
     changed: (n: number) => `변경 ${n}개`, clean: '깨끗함 ✓', notRepo: 'git 저장소 아님', nothing: '(아직 작업 없음)',
     more: (n: number) => `… ${n}개 더`, keys1: '⌨ ctrl+x tab 패널 포커스 · ↑↓ 이동 · Enter 열기/접기',
-    keys2: '  📂 폴더 클릭 접기/펼치기 · 파일 클릭 코드 보기 · @ 프롬프트에 넣기',
-    pick: '트리에서 파일을 클릭하세요.', lines: '줄', vkeys: '⌨ g 맨위 · k 위 · j 아래 · e 맨끝 · a @넣기 · x/Esc 닫기',
+    keys2: '  📂 폴더 클릭 접기/펼치기 · 파일 클릭 프롬프트에 @경로',
     kinds: { five_hour: '5시간', seven_day: '주간', seven_day_opus: '주간Opus', seven_day_sonnet: '주간Sonnet', spend_limit: '지출' } as Record<string, string>,
-    binary: '(바이너리 파일)', cut: '… (잘림)', unreadable: '(읽을 수 없음)', outside: '(프로젝트 밖 파일은 열 수 없습니다)',
   },
   en: {
     cmd: 'Open the file tree / git status / work location pane', opened: 'choitree pane opened.', scanning: 'Scanning…',
@@ -46,10 +41,8 @@ const T = {
     steps: (n: number) => `${n} requests`, context: 'Context', limit: 'Limit', reset: 'resets',
     changed: (n: number) => `${n} changed`, clean: 'clean ✓', notRepo: 'not a git repository', nothing: '(no work yet)',
     more: (n: number) => `… ${n} more`, keys1: '⌨ ctrl+x tab focus pane · ↑↓ move · Enter open/fold',
-    keys2: '  📂 click folder to fold · click file to view code · @ insert into prompt',
-    pick: 'Click a file in the tree.', lines: 'lines', vkeys: '⌨ g top · k up · j down · e end · a insert @ · x/Esc close',
+    keys2: '  📂 click folder to fold · click file to insert @path',
     kinds: { five_hour: '5-hour', seven_day: 'Weekly', seven_day_opus: 'Wk Opus', seven_day_sonnet: 'Wk Sonnet', spend_limit: 'Spend' } as Record<string, string>,
-    binary: '(binary file)', cut: '… (truncated)', unreadable: '(cannot read)', outside: '(files outside the project cannot be opened)',
   },
   zh: {
     cmd: '打开文件树 / git 状态 / 工作位置面板', opened: '已打开 choitree 面板。', scanning: '扫描中…',
@@ -57,10 +50,8 @@ const T = {
     steps: (n: number) => `请求 ${n} 次`, context: '上下文', limit: '额度', reset: '重置',
     changed: (n: number) => `${n} 个变更`, clean: '干净 ✓', notRepo: '不是 git 仓库', nothing: '(尚无工作)',
     more: (n: number) => `… 还有 ${n} 个`, keys1: '⌨ ctrl+x tab 聚焦面板 · ↑↓ 移动 · Enter 打开/折叠',
-    keys2: '  📂 点击文件夹折叠/展开 · 点击文件查看代码 · @ 插入到提示',
-    pick: '请在树中点击文件。', lines: '行', vkeys: '⌨ g 顶部 · k 上 · j 下 · e 底部 · a 插入@ · x/Esc 关闭',
+    keys2: '  📂 点击文件夹折叠/展开 · 点击文件插入 @路径',
     kinds: { five_hour: '5小时', seven_day: '每周', seven_day_opus: '每周Opus', seven_day_sonnet: '每周Sonnet', spend_limit: '支出' } as Record<string, string>,
-    binary: '(二进制文件)', cut: '… (已截断)', unreadable: '(无法读取)', outside: '(无法打开项目外的文件)',
   },
   ja: {
     cmd: 'ファイルツリー・git 状態・作業位置パネルを開く', opened: 'choitree パネルを開きました。', scanning: 'スキャン中…',
@@ -68,10 +59,8 @@ const T = {
     steps: (n: number) => `リクエスト ${n} 回`, context: 'コンテキスト', limit: '上限', reset: 'リセット',
     changed: (n: number) => `変更 ${n} 件`, clean: 'クリーン ✓', notRepo: 'git リポジトリではありません', nothing: '(まだ作業なし)',
     more: (n: number) => `… 他 ${n} 件`, keys1: '⌨ ctrl+x tab パネルにフォーカス · ↑↓ 移動 · Enter 開く/たたむ',
-    keys2: '  📂 フォルダをクリックで開閉 · ファイルをクリックでコード表示 · @ プロンプトに挿入',
-    pick: 'ツリーのファイルをクリックしてください。', lines: '行', vkeys: '⌨ g 先頭 · k 上 · j 下 · e 末尾 · a @挿入 · x/Esc 閉じる',
+    keys2: '  📂 フォルダをクリックで開閉 · ファイルをクリックで @パス を挿入',
     kinds: { five_hour: '5時間', seven_day: '週間', seven_day_opus: '週Opus', seven_day_sonnet: '週Sonnet', spend_limit: '支出' } as Record<string, string>,
-    binary: '(バイナリファイル)', cut: '… (省略)', unreadable: '(読み込めません)', outside: '(プロジェクト外のファイルは開けません)',
   },
 }
 let L: (typeof T)['ko'] = T.en
@@ -181,23 +170,6 @@ const iconOf = (label: string, isDir: boolean, isOpen: boolean) => {
   if (isDir) return isOpen ? '📂' : '📁'
   const n = label.toLowerCase()
   return NAME[n] ?? EXT[n.split('.').pop() ?? ''] ?? '📄'
-}
-
-const openView = async ($: any, root: string, path: string) => {
-  let text: string
-  try {
-    if (path.split('/').includes('..')) throw new Error('outside')
-    const realRoot = norm((await $.fs.stat(root, { resolve: true })).realPath ?? root)
-    const st = await $.fs.stat(`${root}/${path}`, { resolve: true })
-    if (!st.realPath || !inside(realRoot, norm(st.realPath))) throw new Error('outside')
-    text = await $.fs.read(norm(st.realPath))
-    if (text.includes('\u0000')) text = L.binary
-    else if (text.length > 400000) text = text.slice(0, 400000) + '\n' + L.cut
-  } catch (err) {
-    text = String(err).includes('outside') ? L.outside : L.unreadable
-  }
-  await update($, viewing, () => ({ path, text, top: 0 }))
-  await $.ui.open({ id: VIEW, title: `${path.split('/').pop()} ✕`, closeOnEscape: true })
 }
 
 type Line = { depth: number; label: string; path: string; isDir: boolean; count: number }
@@ -381,18 +353,9 @@ export const register: Register = (on, options) => {
                 onPress={() =>
                   l.isDir
                     ? void update($, opened, o => ({ ...o, [l.path]: !hot(l.path) }))
-                    : void openView($, s.root, l.path)
+                    : void $.prompt.fill({ text: `@${l.path} `, mode: 'insert' })
                 }
               />
-              {!l.isDir && (
-                <Button
-                  key={'@' + l.path}
-                  label=" @"
-                  plain
-                  dimColor
-                  onPress={() => void $.prompt.fill({ text: `@${l.path} `, mode: 'insert' })}
-                />
-              )}
               {l.isDir && !hot(l.path) && <Text dimColor> ({l.count})</Text>}
               {t && !isCur && <Text color="blue"> ← {t.tool}</Text>}
             </Box>
@@ -402,48 +365,6 @@ export const register: Register = (on, options) => {
         <Text dimColor>────────────────</Text>
         <Text dimColor>{L.keys1}</Text>
         <Text dimColor>{L.keys2}</Text>
-      </Box>
-    )
-  })
-
-  on('ui.render', { component: 'Pane', requestId: VIEW }, async ($, e) => {
-    const { Box, Text, Button } = $.ui.resolve(e)
-    const v = await read($, viewing)
-    if (!v) return <Text dimColor>{L.pick}</Text>
-    const all = v.text.split('\n')
-    const room = Math.max(5, (e.viewport?.rows ?? 30) - 6)
-    const top = Math.min(v.top, Math.max(0, all.length - room))
-    const w = String(all.length).length
-    const move = (d: number) => () =>
-      void update($, viewing, x => (x ? { ...x, top: Math.max(0, Math.min(x.top + d, all.length - room)) } : x))
-    return (
-      <Box flexDirection="column">
-        <Box flexDirection="row" justifyContent="space-between">
-          <Box flexDirection="row" flexShrink={1}>
-            <Text>{iconOf(v.path.split('/').pop() ?? '', false, false)} </Text>
-            <Text bold color="cyan" wrap="truncate-start">{v.path}</Text>
-          </Box>
-          <Button key="close" label=" ✕ " hotkey="x" plain role="dismiss" onPress={() => void $.ui.close({ id: VIEW })} />
-        </Box>
-        <Box flexDirection="row">
-          <Button key="top" label="⤒" hotkey="g" plain onPress={move(-all.length)} />
-          <Text> </Text>
-          <Button key="pgup" label="▲" hotkey="k" plain onPress={move(-room)} />
-          <Text> </Text>
-          <Button key="pgdn" label="▼" hotkey="j" plain onPress={move(room)} />
-          <Text> </Text>
-          <Button key="end" label="⤓" hotkey="e" plain onPress={move(all.length)} />
-          <Text> </Text>
-          <Button key="at" label="@" hotkey="a" plain onPress={() => void $.prompt.fill({ text: `@${v.path} `, mode: 'insert' })} />
-          <Text dimColor>  {top + 1}–{Math.min(top + room, all.length)} / {all.length} {L.lines}</Text>
-        </Box>
-        <Text dimColor wrap="truncate-end">{L.vkeys}</Text>
-        {all.slice(top, top + room).map((line, i) => (
-          <Box flexDirection="row" key={String(top + i)}>
-            <Text dimColor>{String(top + i + 1).padStart(w)} │ </Text>
-            <Text>{line.replace(/\t/g, '  ') || ' '}</Text>
-          </Box>
-        ))}
       </Box>
     )
   })
